@@ -19,8 +19,8 @@ try:
     # 嘗試從 Streamlit 保險箱中拿出鑰匙
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-    # 使用 Google 最新且反應最快的 flash 模型
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 【關鍵修改】Google 已淘汰 1.5 版，我們直接升級呼叫最新的 2.5 版模型
+    model = genai.GenerativeModel('gemini-2.5-flash')
     api_ready = True
 except Exception as e:
     st.error("⚠️ 找不到 Gemini API Key！請確認是否已在 Streamlit 的 Settings -> Secrets 中設定 `GEMINI_API_KEY`。")
@@ -38,7 +38,7 @@ def analyze_news_with_ai(title, publisher):
     【重點總結】：用繁體中文，將這則新聞對投資人的意義濃縮成一句話。
     """
     try:
-        # 【關鍵修改】手動降低 AI 的安全審查，避免財經新聞的軍事/衝突字眼被誤殺
+        # 手動降低 AI 的安全審查，避免財經新聞的軍事/衝突字眼被誤殺
         response = model.generate_content(
             prompt,
             safety_settings=[
@@ -50,7 +50,6 @@ def analyze_news_with_ai(title, publisher):
         )
         return response.text
     except Exception as e:
-        # 這次我們不藏了，如果 AI 再報錯，直接把真實原因印在畫面上！
         return f"❌ AI 拒絕回答或發生錯誤，真實原因：{e}"
 
 st.subheader(f"🔍 關於 **{ticker_symbol}** 的最新 AI 分析")
