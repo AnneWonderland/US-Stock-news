@@ -37,6 +37,13 @@ if ticker_symbol:
         else:
             st.warning(f"目前找不到關於 {ticker_symbol} 的新聞。")
             
+    except Exception as e:
+        # 顯示給使用者的友善訊息
+        st.error("發生錯誤，請確認輸入的股票代號是否正確，或稍後再試。")
+        # 顯示給開發者（我們）看的真實錯誤訊息
+        st.error(f"詳細錯誤訊息：{e}")
+        st.exception(e)
+            
   except Exception as e:
         st.error("發生錯誤，請確認輸入的股票代號是否正確，或稍後再試。")
         st.error(f"詳細錯誤訊息：{e}") # 加入這行來顯示真實的系統錯誤
