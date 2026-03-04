@@ -20,53 +20,69 @@ if ticker_symbol:
         stock = yf.Ticker(ticker_symbol)
         news_list = stock.news
         
-        if news_list:
-            for news in news_list:
-                # 【防呆機制】Yahoo Finance 的資料結構可能會變動，我們使用更安全的抓取方式
-                # 有時候新聞的真實資料會被包在一層叫做 'content' 的殼裡面
-                content = news.get('content', news) 
-                
-                # 1. 安全取得標題 (找不到就顯示 '無標題')
-                title = content.get('title', news.get('title', '無標題'))
-                
-                # 2. 安全取得連結
-                if 'clickThroughUrl' in content:
-                    link = content['clickThroughUrl'].get('url', '#')
-                else:
-                    link = content.get('link', news.get('link', '#'))
-                    
-                # 3. 安全取得新聞來源
-                if 'provider' in content:
-                    publisher = content['provider'].get('displayName', '未知來源')
-                else:
-                    publisher = content.get('publisher', news.get('publisher', '未知來源'))
-                
-                # 4. 安全處理時間戳記
-                pub_time_raw = content.get('pubDate', news.get('providerPublishTime', 0))
-                try:
-                    # 如果是 Unix Timestamp (數字)
-                    if isinstance(pub_time_raw, (int, float)) and pub_time_raw > 0:
-                        publish_time = datetime.fromtimestamp(pub_time_raw)
-                        time_str = publish_time.strftime('%Y-%m-%d %H:%M:%S')
-                    # 如果是 ISO 格式字串 (2024-03-04T12:00:00Z)
-                    elif isinstance(pub_time_raw, str):
-                        time_str = pub_time_raw[:10] + " " + pub_time_raw[11:19]
+        # 【終極防護 1】確保抓回來的資料是一個清單，而且不是空的
+        if news_list and isinstance(news_list, list):
+            
+            # 【終極防護 2】無情過濾掉所有 Yahoo 塞進來的「空殼」或「非字典」的髒資料
+            valid_news = [n for n in news_list if isinstance(n, dict) and n]
+            
+            if valid_news:
+                for news in valid_news:
+                    # 【終極防護 3】確保 content 存在且是安全的字典格式
+                    content = news.get('content')
+                    if not isinstance(content, dict):
+                        content = news 
+                        
+                    # 1. 安全取得標題 (轉成字串防呆)
+                    title = str(content.get('title', news.get('title', '無標題')))
+                    if title == 'None' or not title.strip():
+                        title = '無標題'
+                        
+                    # 2. 安全取得連結
+                    link = '#'
+                    if 'clickThroughUrl' in content and isinstance(content['clickThroughUrl'], dict):
+                        link = str(content['clickThroughUrl'].get('url', '#'))
                     else:
-                        time_str = "未知時間"
-                except Exception:
-                    time_str = "時間解析錯誤"
-                
-                # 顯示新聞標題 (附帶超連結)
-                st.markdown(f"### [{title}]({link})")
-                
-                # 顯示新聞來源與時間
-                st.caption(f"新聞來源: {publisher} | 發布時間: {time_str}")
-                
-                # 簡單分隔線
-                st.divider()
+                        link = str(content.get('link', news.get('link', '#')))
+                        
+                    # 3. 安全取得新聞來源
+                    publisher = '未知來源'
+                    if 'provider' in content and isinstance(content['provider'], dict):
+                        publisher = str(content['provider'].get('displayName', '未知來源'))
+                    else:
+                        publisher = str(content.get('publisher', news.get('publisher', '未知來源')))
+                    
+                    # 4. 安全處理時間戳記
+                    time_str = "發布時間未知"
+                    pub_time_raw = content.get('pubDate', news.get('providerPublishTime'))
+                    
+                    try:
+                        # 如果是數字格式 (Unix Timestamp)
+                        if isinstance(pub_time_raw, (int, float)):
+                            # 有些時間會多給毫秒，太長的話要除以1000
+                            if pub_time_raw > 1e11: 
+                                pub_time_raw = pub_time_raw / 1000
+                            time_str = datetime.fromtimestamp(pub_time_raw).strftime('%Y-%m-%d %H:%M:%S')
+                        # 如果是字串格式
+                        elif isinstance(pub_time_raw, str) and len(pub_time_raw) >= 19:
+                            time_str = pub_time_raw[:10] + " " + pub_time_raw[11:19]
+                    except Exception:
+                        pass # 時間解析失敗就隨它去，維持預設字眼
+                    
+                    # 顯示新聞標題
+                    if link != '#' and link != 'None':
+                        st.markdown(f"### [{title}]({link})")
+                    else:
+                        st.markdown(f"### {title}")
+                    
+                    # 顯示新聞來源與時間
+                    st.caption(f"新聞來源: {publisher} | {time_str}")
+                    st.divider()
+            else:
+                st.warning(f"目前沒有 {ticker_symbol} 的有效新聞資料。")
         else:
             st.warning(f"目前找不到關於 {ticker_symbol} 的新聞。")
             
     except Exception as e:
-        st.error("發生錯誤，請確認輸入的股票代號是否正確，或稍後再試。")
+        st.error("系統發生未預期的錯誤，請稍後再試。")
         st.error(f"詳細錯誤訊息：{e}")
