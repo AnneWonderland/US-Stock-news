@@ -27,7 +27,6 @@ except Exception as e:
 
 # --- AI 分析專用功能 ---
 def analyze_news_with_ai(title, publisher):
-    # 這就是我們遞給廚房(AI)的菜單(提示詞 Prompt)
     prompt = f"""
     你是一位專業的華爾街股市分析師。請根據以下這則財經新聞標題與來源，判斷對該公司股價的短期影響。
     新聞標題：{title}
@@ -39,11 +38,20 @@ def analyze_news_with_ai(title, publisher):
     【重點總結】：用繁體中文，將這則新聞對投資人的意義濃縮成一句話。
     """
     try:
-        # 呼叫 AI 產生內容
-        response = model.generate_content(prompt)
+        # 【關鍵修改】手動降低 AI 的安全審查，避免財經新聞的軍事/衝突字眼被誤殺
+        response = model.generate_content(
+            prompt,
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+            ]
+        )
         return response.text
     except Exception as e:
-        return f"AI 暫時無法分析，請稍後再試。"
+        # 這次我們不藏了，如果 AI 再報錯，直接把真實原因印在畫面上！
+        return f"❌ AI 拒絕回答或發生錯誤，真實原因：{e}"
 
 st.subheader(f"🔍 關於 **{ticker_symbol}** 的最新 AI 分析")
 
@@ -91,8 +99,11 @@ if ticker_symbol:
                         # 把新聞丟給 AI 分析並顯示結果
                         if title != '無標題':
                             ai_result = analyze_news_with_ai(title, publisher)
-                            # 用綠色框框突顯 AI 的分析結果
-                            st.success(ai_result)
+                            # 如果包含錯誤符號就顯示紅色警告，成功則顯示綠色
+                            if "❌" in ai_result:
+                                st.error(ai_result)
+                            else:
+                                st.success(ai_result)
                             
                         st.divider()
                         
